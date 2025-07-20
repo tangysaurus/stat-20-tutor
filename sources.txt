@@ -1,0 +1,2 @@
+https://github.com/D-Star-AI/dsRAG
+https://python.langchain.com/docs/tutorials/rag/

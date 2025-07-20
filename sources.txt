@@ -1,2 +1,3 @@
 https://github.com/D-Star-AI/dsRAG
 https://python.langchain.com/docs/tutorials/rag/
+https://d-star.ai/solving-the-out-of-context-chunk-problem-for-rag/

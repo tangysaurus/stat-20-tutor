@@ -246,9 +246,15 @@ class KnowledgeGraph:
         return final_data
     
     def query_chain(self, llm, vector_index, entity_chain):
-        template = """Answer the question based only on the following context:
-        {context}
-
+        template = """
+        You are a chatbot tutor for an educational learning platform.
+        Answer the question strictly based on the following context. DO NOT reference outside sources.
+        Your response should be friendly and easy to understand for a student.
+        Keep it short and concise. Avoid over explaining. Your goal is to help the student ask better questions.
+        If you don't have enough context to generate a response, explicitly state that.
+        
+        Context: {context}
+        
         Question: {question}
         """
         prompt = ChatPromptTemplate.from_template(template)

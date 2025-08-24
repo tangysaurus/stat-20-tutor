@@ -1,3 +1,0 @@
-https://medium.com/data-science/building-knowledge-graphs-with-llm-graph-transformer-a91045c49b59
-https://python.langchain.com/docs/how_to/graph_constructing/
-https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8362657

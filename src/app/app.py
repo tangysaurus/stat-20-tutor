@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from tutor import KnowledgeGraph
 from langchain.embeddings import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
+from tools import wolfram
 
 load_dotenv()
 NEO_PASSWORD = os.getenv("NEO_PASSWORD")
@@ -19,11 +20,11 @@ llm = ChatOpenAI(
     timeout=None,
     max_retries=2,
 )
+llm_with_tools = llm.bind_tools([wolfram])
 
 embeddings = OpenAIEmbeddings()
 vector_index = knowledge_graph.create_vector_index(embeddings)
 entity_chain = knowledge_graph.create_entity_chain(llm)
-chain = knowledge_graph.query_chain(llm, vector_index, entity_chain)
 
 app = Flask(__name__)
 
@@ -35,7 +36,7 @@ def index():
 def chat():
     data = request.get_json()
     user_message = data.get("message")
-    reply = knowledge_graph.ask_query(llm, chain, user_message)
+    reply = knowledge_graph.ask_query(llm_with_tools, vector_index, entity_chain, user_message)
     return jsonify({"reply": reply})
 
 if __name__ == "__main__":

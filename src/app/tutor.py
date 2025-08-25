@@ -6,9 +6,9 @@ from langchain_community.vectorstores.neo4j_vector import remove_lucene_chars
 from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
-from langchain_core.output_parsers import StrOutputParser
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from tools import wolfram
+import time
 
 class KnowledgeGraph:
     SYSTEM_PROMPT = (
@@ -245,45 +245,82 @@ class KnowledgeGraph:
         """
         return final_data
     
-    def query_chain(self, llm, vector_index, entity_chain):
+    def create_query_chain(self, llm):
         template = """
         You are a chatbot tutor for an educational learning platform.
         Answer the question strictly based on the following context. DO NOT reference outside sources.
         Your response should be friendly and easy to understand for a student.
         Keep it short and concise. Avoid over explaining. Your goal is to help the student ask better questions.
-        If you don't have enough context to generate a response, explicitly state that.
-        
-        Context: {context}
+        If you don't have enough context from the course material and previous tool calls to generate a response, try using one of the tools explicitly given to you (e.g. wolframalpha) to get more information.
+        If you use a tool, make sure your query is in the form of a single concept (e.g. normal distribution, central limit theorem, or population of France).
+
+        Course context: {context}
+
+        Tool context: {memory}
         
         Question: {question}
         """
         prompt = ChatPromptTemplate.from_template(template)
-        _context = RunnableLambda(
-            lambda q: self.retriever(question = q, 
-                                     vector_index = vector_index, 
-                                     entity_chain = entity_chain)
-        )
 
         chain = (
             RunnableParallel(
                 {
-                    "context": _context,
+                    "context": RunnablePassthrough(),
+                    "memory": RunnablePassthrough(),
                     "question": RunnablePassthrough(),
                 }
             )
             | prompt
             | llm
-            | StrOutputParser()
         )
         
         return chain
     
-    def ask_query(self, llm, chain, question: str):
+    def ask_query(self, llm, vector_index, entity_chain, question: str, max_tool_calls: Optional[int] = 4):
         revised_question = self.rewrite_query(llm, question)
         self.chat_history.append({"user": revised_question})
-        response = chain.invoke(revised_question)
-        self.chat_history.append({"assistant": response})
-        return response
+
+        context = self.retriever(question = question,
+                                        vector_index = vector_index,
+                                        entity_chain = entity_chain)
+        
+        memory = []
+
+        query_chain = self.create_query_chain(llm)
+        response = query_chain.invoke(
+            {
+                "context": context, 
+                "memory": str(memory), 
+                "question": revised_question
+            }
+        )
+        tool_calls = response.tool_calls
+        num_tool_calls = 0
+
+        while len(tool_calls) > 0 and num_tool_calls < max_tool_calls:
+            if tool_calls[0]["name"] == "wolfram":
+                num_tool_calls += 1
+                tool_response = wolfram.invoke(tool_calls[0])
+                print(f"Tool call: {tool_calls[0]}")
+                print(f"Tool response: {tool_response}")
+                memory.append({"Tool call": str(tool_calls[0]), "Response": tool_response.content})
+            query_chain = self.create_query_chain(llm)
+            response = query_chain.invoke(
+                {
+                    "context": context, 
+                    "memory": str(memory), 
+                    "question": revised_question
+                }
+            )
+            tool_calls = response.tool_calls
+        
+        if not response.content:
+            reply = "I don't have enough context to answer this question."
+        else:
+            reply = response.content
+            
+        self.chat_history.append({"assistant": reply})
+        return reply
     
     def rewrite_query(self, llm, question: str):
         """Rewrites question based on conversation history"""

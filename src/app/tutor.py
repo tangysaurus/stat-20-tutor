@@ -5,7 +5,7 @@ from langchain_community.vectorstores import Neo4jVector
 from langchain_community.vectorstores.neo4j_vector import remove_lucene_chars
 from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tools import wolfram
 import time
@@ -301,8 +301,8 @@ class KnowledgeGraph:
             if tool_calls[0]["name"] == "wolfram":
                 num_tool_calls += 1
                 tool_response = wolfram.invoke(tool_calls[0])
-                print(f"Tool call: {tool_calls[0]}")
-                print(f"Tool response: {tool_response}")
+                # print(f"Tool call: {tool_calls[0]}")
+                # print(f"Tool response: {tool_response}")
                 memory.append({"Tool call": str(tool_calls[0]), "Response": tool_response.content})
             query_chain = self.create_query_chain(llm)
             response = query_chain.invoke(
@@ -320,7 +320,10 @@ class KnowledgeGraph:
             reply = response.content
             
         self.chat_history.append({"assistant": reply})
-        return reply
+
+        for word in reply.split(" "):
+            yield word + " "
+            time.sleep(0.05)
     
     def rewrite_query(self, llm, question: str):
         """Rewrites question based on conversation history"""
